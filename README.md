@@ -9,4 +9,4 @@ Analysis of brain signals is essential to the study of mental states and various
 
 The Dataset used in our paper is a published open access EEG+fNIRS dataset available 
 #### [here](http://doc.ml.tu-berlin.de/simultaneous_EEG_NIRS/). 
-This dataset consists of simultaneous measurements of EEG and fNIRS signals from 26 healthy subjects performing a Word Generation or Baseline (Resting) task. The EEG recording consists of 30 channels and fNIRS is recorded with 36 channels oxygenated and 36 de-oxygenated channels.
+This dataset consists of simultaneous measurements of EEG and fNIRS signals from 26 healthy subjects performing a Word Generation or Baseline (Resting) task. 
