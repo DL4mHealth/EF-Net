@@ -7,6 +7,5 @@ Analysis of brain signals is essential to the study of mental states and various
 
 ### Dataset
 
-The Dataset used in our paper is a published open access EEG+fNIRS dataset available 
-#### [here](http://doc.ml.tu-berlin.de/simultaneous_EEG_NIRS/). 
+The Dataset used in our paper is a published open access EEG+fNIRS dataset available [here](http://doc.ml.tu-berlin.de/simultaneous_EEG_NIRS/). 
 This dataset consists of simultaneous measurements of EEG and fNIRS signals from 26 healthy subjects performing a Word Generation or Baseline (Resting) task. 

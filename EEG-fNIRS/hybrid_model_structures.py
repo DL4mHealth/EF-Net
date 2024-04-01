@@ -8,7 +8,6 @@ from tensorflow.keras.layers import concatenate, Lambda, Dense
 from tensorflow.keras import Input
 
 
-
 from tensorflow.keras.applications import vgg16
 from tensorflow.keras.layers import Normalization
 
