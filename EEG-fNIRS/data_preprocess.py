@@ -12,6 +12,115 @@ window=5  #in seconds
 #[We will always downsample because better performance.]
 downsampled=True       #dropping the samples to half
 
+def extract_subj_dep(subject,baseline):
+    file_path = "./FNIRS_data/FNIRS2/NIRS_01-26_MATLAB/VP0"+subject+"-NIRS/cnt_wg.mat"
+    file_path2 = "./EEG_data/EEG2/EEG_01-26_MATLAB/VP0"+subject+"-EEG/cnt_wg.mat"
+    fnirsdata = scipy.io.loadmat(file_path, simplify_cells=True)
+    eegdata= scipy.io.loadmat(file_path2, simplify_cells=True)
+
+    #len of total NIRs signal 
+    #fnirs_data_len=len(fnirsdata['cnt_wg']['deoxy']['x'])
+    #len of total EEG signal 
+    #eeg_data_len=len(eegdata['cnt_wg']['x'])
+
+    #mark file 
+    file_path3 = "./FNIRS_data/FNIRS2/NIRS_01-26_MATLAB/VP0"+subject+"-NIRS/mrk_wg.mat"
+    file_path4 = "./EEG_data/EEG2/EEG_01-26_MATLAB/VP0"+subject+"-EEG/mrk_wg.mat"
+    #loadmat func. 
+    fnirs_session_marks = scipy.io.loadmat(file_path3, simplify_cells=True)
+    eeg_session_marks = scipy.io.loadmat(file_path4, simplify_cells=True)
+
+    #len of total NIRs events 
+    fstart_times_ms=fnirs_session_marks['mrk_wg']['time']
+    #ftime_len=len(fnirs_session_marks['mrk_wg']['time'])
+    #len of total EEG events 
+    estart_times_ms=eeg_session_marks['mrk_wg']['time']
+    #etime_len=len(eeg_session_marks['mrk_wg']['time'])
+
+    y_raw_fnirs=fnirs_session_marks['mrk_wg']['y']
+    #y_raw_eeg=eeg_session_marks['mrk_wg']['y']
+
+    #split data into 60 trials, save extra data set to separate fnirs and eeg.
+    X_fnirs=[]
+    X_eeg=[]
+    Y=[]
+
+    #fnirs
+    data_deoxy=fnirsdata['cnt_wg']['deoxy']['x']
+    data_oxy=fnirsdata['cnt_wg']['oxy']['x']
+    #eeg
+    data_eeg=eegdata['cnt_wg']['x']
+
+    for i,ftask_idx in enumerate(fstart_times_ms):     
+    
+        etask_idx=estart_times_ms[i]
+         
+        #using time array to index tasks.
+        ftask_idx= ftask_idx/1000      #ms to seconds
+        ftask_idx=round(ftask_idx*freq_f)        #seconds to samples(freq)
+        #discarding first 2 seconds of trial, and taking the next 10 seconds from both oxy and deoxy data.
+        task_deoxy=data_deoxy[(ftask_idx+2*freq_f):(ftask_idx+12*freq_f)]
+        task_oxy=data_oxy[(ftask_idx+2*freq_f):(ftask_idx+12*freq_f)]
+        
+        etask_idx= etask_idx/1000      #ms to seconds
+        etask_idx=round(etask_idx*freq_e)        #seconds to samples(freq)
+        #discarding first 2 seconds of trial, and taking the next 10 seconds from eeg data.
+        task_eeg=data_eeg[(etask_idx+2*freq_e):(etask_idx+12*freq_e)]
+
+        #attaching oxy to deoxy on the right.
+        tasks_fnirs=np.concatenate((task_deoxy, task_oxy), axis=1)
+        print("tasks shape",tasks_fnirs.shape)
+        
+        #windows indexes to sample 
+        e_range=range(0,task_eeg.shape[0],freq_e*slide)
+
+        for k,j in enumerate(range(0,tasks_fnirs.shape[0],freq_f*slide)):
+            ftask_sample=tasks_fnirs[j:(j+freq_f*window),:]    #5s sample
+            etask_sample=task_eeg[e_range[k]:(e_range[k]+freq_e*window),:]
+
+            #downsample:
+            if downsampled:
+                ftask_sample=ftask_sample[1::2]
+                etask_sample=etask_sample[1::2]
+
+            if baseline:
+                #reshaping for resnet
+                eegsample=np.zeros([3,200,32])
+                eegsample[0,0:200,0:30]=etask_sample[0:200,0:30]
+                eegsample[1,0:200,0:30]=etask_sample[150:350,0:30]
+                eegsample[2,0:200,0:30]=etask_sample[300:500,0:30]
+                eegsample = eegsample.transpose((1, 2, 0))
+
+                fnirssample=np.zeros([3,32,72])
+                fnirssample[0,0:25,0:72]=ftask_sample[0:25,0:72]    #actual data is only 25x72
+                fnirssample = fnirssample.transpose((1, 2, 0))
+
+            if baseline:    #append data as 3 channels 
+                    X_fnirs.append(fnirssample)
+                    X_eeg.append(eegsample)
+            else:                   #as a features matrix, samplesxchannels - EEG=500,30,1 FNIRS=25,72,1
+                    ftask_sample=np.reshape(ftask_sample,(ftask_sample.shape[0],ftask_sample.shape[1],1))
+                    etask_sample=np.reshape(etask_sample,(etask_sample.shape[0],etask_sample.shape[1],1))
+                    X_fnirs.append(ftask_sample)
+                    X_eeg.append(etask_sample)
+            #taking binary labels for binary_crossentropy predictions.
+            Y.append(y_raw_fnirs[:,i])
+
+            #check if window slide is ending.
+            if((j+freq_f*window)>=(tasks_fnirs.shape[0])):
+                break
+        print("Length of data samples, ",len(Y))
+
+    X_fnirs=np.array(X_fnirs)
+    X_eeg=np.array(X_eeg)
+    Y=np.array(Y)
+
+    print(X_fnirs.shape)
+    print(X_eeg.shape)
+    print(Y.shape)
+
+    return X_eeg, X_fnirs, Y
+
 def extract_subj_semidep(input_e_directory,input_f_directory,baseline):
 
     #Importing all Subjects
@@ -23,7 +132,6 @@ def extract_subj_semidep(input_e_directory,input_f_directory,baseline):
     print('Subject Count:', subjcount)
 
     #Looping through all subjects and creating+collecting samples.
-    X=[]
     Y=[]
     X_fnirs=[]
     X_eeg=[]
@@ -153,7 +261,7 @@ def extract_subj_semidep(input_e_directory,input_f_directory,baseline):
                 if((j+freq_f*window)>=(tasks_fnirs.shape[0])):
                     break;
         
-        print('Subject ',subject+1,'is done. Length of X is now:',len(X), 'and length of Y is: ',len(Y))
+        print('Subject ',subject+1,'is done. Length of X is now:',len(X_fnirs), 'and length of Y is: ',len(Y))
 
     X_fnirs=np.array(X_fnirs)
     X_eeg=np.array(X_eeg)
